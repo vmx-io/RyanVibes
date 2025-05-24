@@ -16,6 +16,13 @@
         {{ employee.name }} ({{ employee.department }})
       </option>
     </select>
+    <!-- Test button for popup - only visible in development mode -->
+    <button type="button"
+            class="test-popup-btn"
+            (click)="testCoworkerPopup()"
+            style="margin-left: 10px; padding: 5px 10px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 4px; cursor: pointer;">
+      Test Popup
+    </button>
   </div>
 
   <div *ngIf="selectedEmployee" class="employee-details">
@@ -28,6 +35,25 @@
 
   <div class="calendar-container custom-calendar">
     <full-calendar #calendar [options]="calendarOptions"></full-calendar>
+  </div>
+
+  <!-- Coworkers Popup -->
+  <app-coworker-popup
+    [visible]="showCoworkersPopup"
+    [employeeName]="selectedEmployee?.name || ''"
+    [shiftDate]="popupShiftDate"
+    [shiftStart]="popupShiftStart"
+    [shiftEnd]="popupShiftEnd"
+    [coworkers]="coworkersOnShift"
+    (close)="closeCoworkersPopup()"
+  ></app-coworker-popup>
+
+  <!-- Debugging popup - will only show in development -->
+  <div *ngIf="showCoworkersPopup" class="debug-info" style="display: none;">
+    <p>Popup is visible: {{showCoworkersPopup}}</p>
+    <p>Employee: {{selectedEmployee?.name}}</p>
+    <p>Date: {{popupShiftDate | date}}</p>
+    <p>Coworkers: {{coworkersOnShift.length}}</p>
   </div>
 
   <div class="legend">

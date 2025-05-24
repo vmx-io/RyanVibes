@@ -381,6 +381,43 @@
   margin-bottom: 5px !important;
 }
 
+/* Make calendar events appear clickable */
+:host ::ng-deep .fc-event {
+  cursor: pointer !important;
+  transition: transform 0.2s, box-shadow 0.2s !important;
+  position: relative !important;
+}
+
+:host ::ng-deep .fc-event:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important;
+  z-index: 10 !important;
+}
+
+:host ::ng-deep .fc-event:active {
+  transform: translateY(0) !important;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.1) !important;
+}
+
+:host ::ng-deep .fc-event::after {
+  content: "👥" !important;
+  position: absolute !important;
+  top: 2px !important;
+  right: 2px !important;
+  font-size: 12px !important;
+  opacity: 0.7 !important;
+}
+
+:host ::ng-deep .fc-event:hover::after {
+  opacity: 1 !important;
+}
+
+/* Explicitly add this class via JavaScript for better reliability */
+:host ::ng-deep .clickable-event {
+  cursor: pointer !important;
+  outline: 1px solid rgba(255, 255, 255, 0.3) !important;
+}
+
 /* Mobile responsiveness - adjust sizes for smaller screens */
 @media (max-width: 768px) {
   :host ::ng-deep .fc-daygrid-event-harness {

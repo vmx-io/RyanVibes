@@ -1,0 +1,37 @@
+<div *ngIf="visible" class="popup-overlay" (click)="onClose()">
+  <div class="popup-container" (click)="stopPropagation($event)">
+    <button class="close-button" (click)="onClose()">×</button>
+
+    <div class="popup-header">
+      <h2>Coworkers on Shift</h2>
+    </div>
+
+    <div class="popup-content">
+      <div class="shift-details">
+        <h3>{{ employeeName }}'s Shift</h3>
+        <p class="shift-date">{{ formatDate(shiftDate) }}</p>
+        <p class="shift-time" *ngIf="shiftStart && shiftEnd">
+          {{ shiftStart }} - {{ shiftEnd }}
+        </p>
+      </div>
+
+      <div class="coworkers-list">
+        <h4>Coworkers Present:</h4>
+
+        <div *ngIf="coworkers.length === 0" class="no-coworkers">
+          <p>No coworkers scheduled during this shift.</p>
+        </div>
+
+        <ul *ngIf="coworkers.length > 0">
+          <li *ngFor="let coworker of coworkers" class="coworker-item">
+            <div class="coworker-name">{{ coworker.name }}</div>
+            <div class="coworker-department">{{ coworker.department }}</div>
+            <div class="coworker-time" *ngIf="coworker.startTime && coworker.endTime">
+              {{ coworker.startTime }} - {{ coworker.endTime }}
+            </div>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>

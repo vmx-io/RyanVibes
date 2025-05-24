@@ -4,22 +4,32 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { FullCalendarModule, FullCalendarComponent } from '@fullcalendar/angular';
-import { CalendarOptions, EventInput } from '@fullcalendar/core';
+import { CalendarOptions, EventInput, EventClickArg } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import { TimesheetService } from '../../services/timesheet.service';
-import { Employee } from '../../models/timesheet.model';
+import { Employee, Shift } from '../../models/timesheet.model';
+import { CoworkerPopupComponent } from '../coworker-popup/coworker-popup.component';
 
 @Component({
   selector: 'app-timesheet-viewer',
   standalone: true,
-  imports: [CommonModule, FormsModule, FullCalendarModule],
+  imports: [CommonModule, FormsModule, FullCalendarModule, CoworkerPopupComponent],
   templateUrl: './timesheet-viewer.component.html',
   styleUrls: ['./timesheet-viewer.component.css']
 })
 export class TimesheetViewerComponent implements OnInit, OnDestroy {
+
   employees: Employee[] = [];
   selectedEmployeeId: number | null = null;
+
+  // Popup related properties
+  showCoworkersPopup: boolean = false;
+  popupShiftDate: Date | null = null;
+  popupShiftStart: string | null = null;
+  popupShiftEnd: string | null = null;
+  coworkersOnShift: {name: string, department: string, startTime: string | null, endTime: string | null}[] = [];
+
   calendarOptions: CalendarOptions = {
     plugins: [dayGridPlugin, timeGridPlugin],
     initialView: 'dayGridMonth',
@@ -36,6 +46,11 @@ export class TimesheetViewerComponent implements OnInit, OnDestroy {
     height: 'auto',
     // Hide the default time display
     displayEventTime: false,
+    // Event click handler
+    eventClick: (clickInfo) => {
+      console.log('Event clicked via FullCalendar handler');
+      this.handleEventClick(clickInfo);
+    },
     // Format time strings consistently (just in case they appear)
     eventTimeFormat: {
       hour: '2-digit',
@@ -118,6 +133,20 @@ export class TimesheetViewerComponent implements OnInit, OnDestroy {
       if (timeEl) {
         timeEl.style.display = 'none';
       }
+
+      // Add click feedback to help users
+      const eventEl = info.el;
+      eventEl.style.cursor = 'pointer';
+      eventEl.title = 'Click to see coworkers on this shift';
+
+      // Add a visual indicator for clickable events
+      const clickIconEl = document.createElement('div');
+      clickIconEl.innerHTML = '👥';
+      clickIconEl.style.position = 'absolute';
+      clickIconEl.style.top = '2px';
+      clickIconEl.style.right = '2px';
+      clickIconEl.style.fontSize = '12px';
+      eventEl.appendChild(clickIconEl);
     }
   };
 
@@ -149,6 +178,11 @@ export class TimesheetViewerComponent implements OnInit, OnDestroy {
 
     console.log('Timesheet viewer initializing');
 
+    // Add global function for debugging from console
+    (window as any).testCoworkerPopup = () => {
+      this.testCoworkerPopup();
+    };
+
     this.subscription = this.timesheetService.timesheetData$.subscribe(data => {
       if (data) {
         console.log('Received timesheet data:', data);
@@ -165,6 +199,25 @@ export class TimesheetViewerComponent implements OnInit, OnDestroy {
           // Use setTimeout to ensure the calendar is initialized
           setTimeout(() => {
             this.updateCalendar();
+
+            // Show a brief tooltip about clicking shifts
+            console.log('Adding click instruction tooltip');
+            const calendarEl = this.calendarComponent?.getApi()?.el;
+            if (calendarEl) {
+              const instructionEl = document.createElement('div');
+              instructionEl.className = 'click-instruction';
+              instructionEl.textContent = 'Click on a shift to see coworkers';
+              instructionEl.style.textAlign = 'center';
+              instructionEl.style.padding = '5px';
+              instructionEl.style.color = '#666';
+              instructionEl.style.fontSize = '0.9rem';
+              instructionEl.style.marginBottom = '10px';
+
+              const headerEl = calendarEl.querySelector('.fc-header-toolbar');
+              if (headerEl) {
+                headerEl.parentNode?.insertBefore(instructionEl, headerEl.nextSibling);
+              }
+            }
           }, 200); // Increased timeout to ensure calendar is fully initialized
         } else {
           console.warn('No employees found in the data');
@@ -185,6 +238,311 @@ export class TimesheetViewerComponent implements OnInit, OnDestroy {
   onEmployeeChange(): void {
     console.log('Employee selection changed to ID:', this.selectedEmployeeId, 'Type:', typeof this.selectedEmployeeId);
     this.updateCalendar();
+  }
+
+  // Handle event click to show coworkers popup
+  handleEventClick(clickInfo: EventClickArg): void {
+    console.log('EVENT CLICK HANDLER TRIGGERED!', new Date().toISOString());
+
+    // Prevent default action (like URL navigation)
+    clickInfo.jsEvent.preventDefault();
+    clickInfo.jsEvent.stopPropagation();
+
+    // Log the entire event object to debug
+    console.log('Clicked event object:', clickInfo.event);
+    console.log('Event props:', clickInfo.event.extendedProps);
+    console.log('DOM element:', clickInfo.el);
+
+    // Add a visual indicator that the click was registered
+    clickInfo.el.style.border = '2px solid yellow';
+    setTimeout(() => {
+      // Revert after a brief moment
+      clickInfo.el.style.border = '';
+    }, 500);
+
+    // Get the event date and times
+    const eventDate = clickInfo.event.start ? new Date(clickInfo.event.start) : null;
+    const startTime = clickInfo.event.extendedProps['startTime'] as string | null;
+    const endTime = clickInfo.event.extendedProps['endTime'] as string | null;
+    const isOvernightShift = clickInfo.event.extendedProps['isOvernightShift'] as boolean;
+
+    console.log('Event clicked:', {
+      date: eventDate?.toDateString(),
+      startTime,
+      endTime,
+      isOvernightShift
+    });
+
+    // Don't proceed if we don't have a selected employee or valid date
+    if (!this.selectedEmployee || !eventDate) {
+      console.warn('Cannot show coworkers: Missing employee or event date');
+      return;
+    }
+
+    // Find coworkers who are also scheduled for this shift
+    this.findCoworkersOnShift(eventDate, startTime, endTime, isOvernightShift);
+
+    // Set popup data
+    this.popupShiftDate = eventDate;
+    this.popupShiftStart = startTime;
+    this.popupShiftEnd = endTime;
+
+    // Show the popup
+    this.showCoworkersPopup = true;
+  }
+
+  // Find all coworkers who are working during the selected shift
+  findCoworkersOnShift(date: Date, startTime: string | null, endTime: string | null, isOvernightShift: boolean): void {
+    // Clear previous list
+    this.coworkersOnShift = [];
+
+    if (!this.selectedEmployee) {
+      return;
+    }
+
+    // Standardize the date for comparison (keep only year, month, day)
+    const shiftDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+    console.log('Finding coworkers for shift on:', shiftDate.toDateString());
+
+    // Helper function to check if two shifts overlap
+    const shiftsOverlap = (
+      shift1Date: Date, shift1Start: string | null, shift1End: string | null, shift1Overnight: boolean,
+      shift2Date: Date, shift2Start: string | null, shift2End: string | null, shift2Overnight: boolean
+    ): boolean => {
+      // If either shift is missing critical info, we can't determine overlap
+      if (!shift1Start || !shift1End || !shift2Start || !shift2End) {
+        // Just check if they're on the same day
+        return shift1Date.getTime() === shift2Date.getTime();
+      }
+
+      // Parse times to compare them
+      const parseTime = (timeStr: string): number => {
+        const parts = timeStr.split(':').map(Number);
+        return (parts[0] || 0) * 60 + (parts[1] || 0); // Convert to minutes
+      };
+
+      const s1Start = parseTime(shift1Start);
+      const s1End = shift1Overnight ? parseTime(shift1End) + 24 * 60 : parseTime(shift1End);
+      const s2Start = parseTime(shift2Start);
+      const s2End = shift2Overnight ? parseTime(shift2End) + 24 * 60 : parseTime(shift2End);
+
+      // Check if there's any overlap
+      return !(s1End <= s2Start || s1Start >= s2End);
+    };
+
+    // Loop through all employees to find those working during this shift
+    this.employees.forEach(employee => {
+      // Skip the selected employee
+      if (employee.id === this.selectedEmployeeId) {
+        return;
+      }
+
+      // Look for any shift that overlaps with the selected shift
+      const overlappingShift = employee.shifts.find(shift => {
+        if (!shift.date) return false;
+
+        // Standardize the date for comparison
+        const shiftDateObj = new Date(shift.date);
+        const employeeShiftDate = new Date(
+          shiftDateObj.getFullYear(),
+          shiftDateObj.getMonth(),
+          shiftDateObj.getDate()
+        );
+
+        // For overnight shifts, we also need to check the next day
+        if (isOvernightShift) {
+          const nextDay = new Date(shiftDate);
+          nextDay.setDate(nextDay.getDate() + 1);
+
+          // Check if employee has a shift on either the start day or the end day
+          if (employeeShiftDate.getTime() === shiftDate.getTime() ||
+              employeeShiftDate.getTime() === nextDay.getTime()) {
+
+            // Now check time overlap
+            const isEmployeeOvernightShift = shift.startTime && shift.endTime ?
+              this.parseTime(shift.startTime) > this.parseTime(shift.endTime) : false;
+
+            return shiftsOverlap(
+              shiftDate, startTime, endTime, isOvernightShift,
+              employeeShiftDate, shift.startTime, shift.endTime, isEmployeeOvernightShift
+            );
+          }
+          return false;
+        } else {
+          // For regular shifts, just check if it's the same day and times overlap
+          if (employeeShiftDate.getTime() === shiftDate.getTime()) {
+            const isEmployeeOvernightShift = shift.startTime && shift.endTime ?
+              this.parseTime(shift.startTime) > this.parseTime(shift.endTime) : false;
+
+            return shiftsOverlap(
+              shiftDate, startTime, endTime, isOvernightShift,
+              employeeShiftDate, shift.startTime, shift.endTime, isEmployeeOvernightShift
+            );
+          }
+          return false;
+        }
+      });
+
+      // If we found an overlapping shift, add this employee to our list
+      if (overlappingShift) {
+        this.coworkersOnShift.push({
+          name: employee.name,
+          department: employee.department,
+          startTime: overlappingShift.startTime,
+          endTime: overlappingShift.endTime
+        });
+      }
+    });
+
+    console.log(`Found ${this.coworkersOnShift.length} coworkers on shift`);
+  }
+
+  // Helper method to parse time
+  parseTime(timeStr: string | null): number {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':').map(Number);
+    return (parts[0] || 0) * 60 + (parts[1] || 0); // Convert to minutes
+  }
+
+  // Close the coworkers popup
+  closeCoworkersPopup(): void {
+    this.showCoworkersPopup = false;
+  }
+
+  // Test function to show the popup with sample data
+  testCoworkerPopup(): void {
+    console.log('Testing coworker popup');
+    this.showCoworkersPopup = true;
+    this.popupShiftDate = new Date(2025, 5, 15); // June 15, 2025
+    this.popupShiftStart = "09:00";
+    this.popupShiftEnd = "17:00";
+    this.coworkersOnShift = [
+      { name: "Test Coworker 1", department: "Testing", startTime: "08:00", endTime: "16:00" },
+      { name: "Test Coworker 2", department: "Development", startTime: "10:00", endTime: "18:00" }
+    ];
+    console.log('Popup should be visible now');
+  }
+
+  // Add direct click handlers to event elements as a backup
+  private addDirectClickHandlers(): void {
+    console.log('Adding direct click handlers to calendar events');
+
+    // Give the DOM a moment to update
+    setTimeout(() => {
+      try {
+        // Find all calendar events
+        const calendarEl = this.calendarComponent?.getApi()?.el;
+        if (!calendarEl) {
+          console.warn('Calendar element not found');
+          return;
+        }
+
+        const eventElements = calendarEl.querySelectorAll('.fc-event');
+        console.log(`Found ${eventElements.length} event elements to add direct click handlers`);
+
+        if (eventElements.length === 0) {
+          console.warn('No calendar events found to attach handlers');
+
+          // Try again later if no events were found
+          setTimeout(() => this.addDirectClickHandlers(), 500);
+          return;
+        }
+
+        // Add click handlers to each event
+        eventElements.forEach((element, index) => {
+          const el = element as HTMLElement;
+
+          // Add a direct onclick attribute for maximum compatibility
+          el.onclick = (e) => {
+            console.log(`Direct onclick handler triggered for event ${index}`);
+            e.preventDefault();
+            e.stopPropagation();
+
+            // Show visual feedback
+            el.style.border = '2px solid green';
+            setTimeout(() => el.style.border = '', 500);
+
+            // Trigger popup directly
+            this.showPopupForEventElement(el);
+
+            return false;
+          };
+
+          // Enhance visual indication that these are clickable
+          el.classList.add('clickable-event');
+          el.style.cursor = 'pointer';
+
+          // Add title attribute for better UX
+          if (!el.title) {
+            el.title = 'Click to see coworkers on this shift';
+          }
+
+          // Add click indicator
+          const indicator = document.createElement('div');
+          indicator.innerHTML = '👥';
+          indicator.style.position = 'absolute';
+          indicator.style.top = '2px';
+          indicator.style.right = '2px';
+          indicator.style.fontSize = '12px';
+          indicator.style.zIndex = '1';
+          el.appendChild(indicator);
+        });
+
+        console.log('Direct click handlers added successfully');
+      } catch (error) {
+        console.error('Error adding direct click handlers:', error);
+      }
+    }, 500);
+  }
+
+  // Show popup for a specific event element
+  private showPopupForEventElement(eventElement: HTMLElement): void {
+    console.log('Showing popup for event element', eventElement);
+
+    // Find date from the parent cell
+    const dateCell = eventElement.closest('.fc-daygrid-day');
+    let eventDate: Date | null = null;
+
+    if (dateCell) {
+      const dateAttr = dateCell.getAttribute('data-date');
+      if (dateAttr) {
+        eventDate = new Date(dateAttr);
+        console.log('Found date from cell:', dateAttr);
+      }
+    }
+
+    if (!eventDate) {
+      console.warn('Could not determine event date');
+      return;
+    }
+
+    // Try to extract time information from the content
+    let startTime: string | null = null;
+    let endTime: string | null = null;
+
+    // Look for time info in the element text
+    const timePattern = /(\d{1,2}:\d{2})\s*-\s*(\d{1,2}:\d{2})/;
+    const text = eventElement.textContent || '';
+    const timeMatch = text.match(timePattern);
+
+    if (timeMatch) {
+      startTime = timeMatch[1];
+      endTime = timeMatch[2];
+      console.log('Extracted times from element:', startTime, endTime);
+    }
+
+    // Find coworkers for this date and time
+    this.findCoworkersOnShift(eventDate, startTime, endTime, false);
+
+    // Set popup data
+    this.popupShiftDate = eventDate;
+    this.popupShiftStart = startTime;
+    this.popupShiftEnd = endTime;
+
+    // Show the popup
+    this.showCoworkersPopup = true;
+    console.log('Popup should now be visible');
   }
 
   private updateCalendar(): void {
@@ -620,7 +978,12 @@ export class TimesheetViewerComponent implements OnInit, OnDestroy {
             end: validRangeEnd
           },
           // Ensure these settings are maintained
-          displayEventTime: false
+          displayEventTime: false,
+          // Direct binding of event click handler
+          eventClick: (clickInfo) => {
+            console.log('Event clicked via FullCalendar handler (updated)');
+            this.handleEventClick(clickInfo);
+          }
         };
 
         console.log(`Setting calendar to show ${initialDate.toDateString()}`);
@@ -644,7 +1007,12 @@ export class TimesheetViewerComponent implements OnInit, OnDestroy {
             end: validRangeEnd
           },
           // Ensure these settings are maintained
-          displayEventTime: false
+          displayEventTime: false,
+          // Direct binding of event click handler
+          eventClick: (clickInfo) => {
+            console.log('Event clicked via FullCalendar handler (updated)');
+            this.handleEventClick(clickInfo);
+          }
         };
 
         console.log(`Setting calendar to June 2025 - no employee shift dates found`);
@@ -668,6 +1036,9 @@ export class TimesheetViewerComponent implements OnInit, OnDestroy {
           calendarApi.render();
           console.log('Calendar refreshed with', events.length, 'events');
           console.log('Calendar view set to full month starting:', monthStart.toDateString());
+
+          // Add click handlers directly to event elements for better reliability
+          this.addDirectClickHandlers();
         } else {
           console.warn('Calendar component API not available');
         }
