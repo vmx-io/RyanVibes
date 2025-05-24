@@ -1,0 +1,58 @@
+<div class="timesheet-container">
+  <div class="timesheet-header">
+    <h2>Timesheet Calendar View</h2>
+    <button (click)="uploadNewFile()" class="upload-new-btn">Upload New File</button>
+  </div>
+
+  <div class="employee-selector form-control">
+    <label for="employee-select">Select Employee:</label>
+    <select
+      id="employee-select"
+      [(ngModel)]="selectedEmployeeId"
+      (change)="onEmployeeChange()"
+      aria-label="Select Employee"
+    >
+      <option *ngFor="let employee of employees" [ngValue]="employee.id">
+        {{ employee.name }} ({{ employee.department }})
+      </option>
+    </select>
+  </div>
+
+  <div *ngIf="selectedEmployee" class="employee-details">
+    <h3>{{ selectedEmployee.name }}</h3>
+    <div class="employee-info">
+      <p>Department: {{ selectedEmployee.department }}</p>
+      <p>Total Hours: {{ selectedEmployee.totalHours.toFixed(2) }}</p>
+    </div>
+  </div>
+
+  <div class="calendar-container custom-calendar">
+    <full-calendar #calendar [options]="calendarOptions"></full-calendar>
+  </div>
+
+  <div class="legend">
+    <h4>Legend:</h4>
+    <div class="legend-items">
+      <div class="legend-item">
+        <span class="color-box" style="background-color: #3f51b5;"></span>
+        <span>Regular Shift</span>
+      </div>
+      <div class="legend-item">
+        <span class="color-box" style="background-color: #673ab7;"></span>
+        <span>Overnight Shift</span>
+      </div>
+      <div class="legend-item">
+        <span class="color-box" style="background-color: #9e9e9e;"></span>
+        <span>Day Off (UW)</span>
+      </div>
+      <div class="legend-item">
+        <span class="color-box" style="background-color: #ff9800;"></span>
+        <span>Training (SZ)</span>
+      </div>
+      <div class="legend-item">
+        <span class="color-box" style="background-color: #009688;"></span>
+        <span>Hours Only</span>
+      </div>
+    </div>
+  </div>
+</div>

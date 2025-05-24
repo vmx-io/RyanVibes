@@ -1,0 +1,9 @@
+:host ::ng-deep .fc-daygrid-event-harness {
+  width: calc(100% - 10px);
+  margin: 1px 5px;
+}
+
+:host ::ng-deep .error {
+  color: #f44336;
+  font-style: italic;
+}

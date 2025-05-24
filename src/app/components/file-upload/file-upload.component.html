@@ -1,0 +1,56 @@
+<div class="upload-container">
+  <div class="upload-card">
+    <h2>Upload Timesheet File</h2>
+
+    <div class="upload-instructions">
+      <p>Please upload an Excel or CSV file containing the timesheet data with the following structure:</p>
+      <ul>
+        <li>Row 1: Title with month and year (e.g., "GRAFIK KTWFOH CZERWIEC'25")</li>
+        <li>Row 2: Day names of the week (niedziela, poniedziałek, etc.)</li>
+        <li>Row 3: Employee label and day numbers (1-31)</li>
+        <li>From Row 4 onward: Employee records (3 rows per employee)</li>
+        <ul>
+          <li>First row: Employee ID (Column A), Department code (Column B), and Employee name (Column C)</li>
+          <li>Second row: Shift start times in first row, end times in second row</li>
+          <li>Third row: Hours worked for each day</li>
+        </ul>
+      </ul>
+      <div class="special-notes">
+        <p>Special values:</p>
+        <ul>
+          <li><strong>UW</strong> - Indicates day off or unavailable</li>
+          <li><strong>SZ</strong> - Indicates training day</li>
+        </ul>
+      </div>
+      <p class="example-file">Example file: KTW_FOH_CZERWIEC'25_VER1.0.xlsx</p>
+    </div>
+
+    <div class="form-control">
+      <label for="file-upload">Select File:</label>
+      <input
+        type="file"
+        id="file-upload"
+        (change)="onFileSelected($event)"
+        accept=".xlsx, .xls, .csv"
+        [disabled]="isLoading"
+      />
+    </div>
+
+    <button
+      (click)="uploadFile()"
+      [disabled]="!selectedFile || isLoading"
+      class="upload-btn"
+    >
+      <span *ngIf="!isLoading">Upload and Process</span>
+      <span *ngIf="isLoading">Processing...</span>
+    </button>
+
+    <div *ngIf="errorMessage" class="alert alert-error">
+      {{ errorMessage }}
+    </div>
+
+    <div *ngIf="successMessage" class="alert alert-success">
+      {{ successMessage }}
+    </div>
+  </div>
+</div>
