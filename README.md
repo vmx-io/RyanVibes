@@ -1,4 +1,33 @@
-# RyanVibes
+# RyanVibes - Timesheet Viewer
+
+An Angular application for viewing and managing employee timesheets.
+
+## Deployment to GitHub Pages
+
+To deploy this application to GitHub Pages, follow these steps:
+
+1. Install dependencies:
+   ```
+   npm install
+   ```
+
+2. Build the application with GitHub Pages configuration:
+   ```
+   npm run build:gh-pages
+   ```
+
+3. Deploy to GitHub Pages:
+   ```
+   npm run deploy:gh-pages
+   ```
+
+## Development Server
+
+Run `ng serve` for a dev server. Navigate to `http://localhost:4200/`. The application will automatically reload if you change any of the source files.
+
+## Build
+
+Run `ng build` to build the project. The build artifacts will be stored in the `dist/` directory.
 
 This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.13.
 
